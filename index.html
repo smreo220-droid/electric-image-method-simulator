@@ -14,8 +14,6 @@
       --muted: #94a3b8;
       --blue: #38bdf8;
       --red: #fb7185;
-      --yellow: #facc15;
-      --green: #34d399;
       --radius: 18px;
     }
 
@@ -225,7 +223,7 @@
           시뮬레이션
           <select id="mode">
             <option value="planePoint">무한평면 도체 + 점전하</option>
-            <option value="lineCharge">무한평면 도체 + 무한 선전하</option>
+            <option value="lineCharge">무한평면 도체 + 선전하</option>
             <option value="sphere">구도체 + 점전하</option>
           </select>
         </label>
@@ -288,7 +286,7 @@
       <div class="formula" id="formulaBox"></div>
 
       <div class="note">
-        실제 전하 단위는 시각화 편의를 위해 입력값을 그대로 사용합니다. 수치 단위까지 엄밀하게 맞추려면 Q를 nC, λ를 nC/m 등으로 고정하고 내부 변환 계수를 추가하면 됩니다.
+        선전하 모드에서는 화면상 긴 막대 전하로 표현하고, 전기장 벡터는 실제 선전하와 영상 선전하의 합성 방향으로 표시합니다.
       </div>
     </aside>
   </main>
@@ -336,7 +334,6 @@ function resizeCanvas() {
   canvas.width = Math.floor(W * devicePixelRatio);
   canvas.height = Math.floor(H * devicePixelRatio);
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  needsRedraw = true;
   draw();
 }
 
@@ -347,7 +344,10 @@ function getQ() {
   const magnitude = Math.abs(Number(chargeInput.value) || 1);
   return sign * magnitude;
 }
-function getA() { return Math.max(0.3, Number(radiusInput.value) || 1.25); }
+
+function getA() {
+  return Math.max(0.3, Number(radiusInput.value) || 1.25);
+}
 
 function fmt(value, unit = '') {
   if (!Number.isFinite(value)) return '-';
@@ -371,9 +371,11 @@ function screenToWorld(sx, sy) {
 }
 
 function resetPosition() {
-  if (modeSelect.value === 'sphere') realCharge = { x: 2.75, y: 0 };
-  else realCharge = { x: 0, y: 1.85 };
-  needsRedraw = true;
+  if (modeSelect.value === 'sphere') {
+    realCharge = { x: 2.75, y: 0 };
+  } else {
+    realCharge = { x: 0, y: 1.85 };
+  }
   draw();
 }
 
@@ -381,6 +383,7 @@ function clampRealCharge() {
   if (modeSelect.value === 'sphere') {
     const a = getA();
     const r = Math.hypot(realCharge.x, realCharge.y);
+
     if (r < a + 0.32) {
       const ang = Math.atan2(realCharge.y, realCharge.x) || 0;
       realCharge.x = (a + 0.32) * Math.cos(ang);
@@ -395,14 +398,24 @@ function drawBackgroundGrid() {
   ctx.save();
   ctx.fillStyle = '#020617';
   ctx.fillRect(0, 0, W, H);
+
   ctx.strokeStyle = 'rgba(148,163,184,0.09)';
   ctx.lineWidth = 1;
+
   for (let x = 0; x <= W; x += 40) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
   }
+
   for (let y = 0; y <= H; y += 40) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
   }
+
   ctx.restore();
 }
 
@@ -413,19 +426,23 @@ function potentialAt(x, y) {
 
   if (mode === 'planePoint') {
     if (y < 0) return 0;
+
     const h = realCharge.y;
     const x0 = realCharge.x;
     const r1 = Math.hypot(x - x0, y - h) + soft;
     const r2 = Math.hypot(x - x0, y + h) + soft;
+
     return Q / r1 - Q / r2;
   }
 
   if (mode === 'lineCharge') {
     if (y < 0) return 0;
+
     const h = realCharge.y;
     const x0 = realCharge.x;
     const r1 = Math.hypot(x - x0, y - h) + soft;
     const r2 = Math.hypot(x - x0, y + h) + soft;
+
     return -Q * Math.log(r1 / r2);
   }
 
@@ -433,14 +450,17 @@ function potentialAt(x, y) {
   const d = Math.hypot(realCharge.x, realCharge.y);
   const ang = Math.atan2(realCharge.y, realCharge.x);
   const r = Math.hypot(x, y);
+
   if (r < a) return 0;
 
   const rp = a * a / d;
   const qi = -(a / d) * Q;
   const ix = rp * Math.cos(ang);
   const iy = rp * Math.sin(ang);
+
   const r1 = Math.hypot(x - realCharge.x, y - realCharge.y) + soft;
   const r2 = Math.hypot(x - ix, y - iy) + soft;
+
   let V = Q / r1 + qi / r2;
 
   if (sphereTypeSelect.value === 'neutral') {
@@ -448,6 +468,7 @@ function potentialAt(x, y) {
     const rc = Math.hypot(x, y) + soft;
     V += qc / rc;
   }
+
   return V;
 }
 
@@ -470,7 +491,9 @@ function colorForPotential(V) {
 
 function drawHeatmap() {
   const step = 7;
+
   ctx.save();
+
   for (let sy = 0; sy < H; sy += step) {
     for (let sx = 0; sx < W; sx += step) {
       const w = screenToWorld(sx + step / 2, sy + step / 2);
@@ -479,15 +502,18 @@ function drawHeatmap() {
       ctx.fillRect(sx, sy, step + 1, step + 1);
     }
   }
+
   ctx.restore();
 }
 
 function fieldAt(x, y) {
   const delta = 0.018;
+
   const vx1 = potentialAt(x + delta, y);
   const vx0 = potentialAt(x - delta, y);
   const vy1 = potentialAt(x, y + delta);
   const vy0 = potentialAt(x, y - delta);
+
   return {
     Ex: -(vx1 - vx0) / (2 * delta),
     Ey: -(vy1 - vy0) / (2 * delta)
@@ -495,20 +521,30 @@ function fieldAt(x, y) {
 }
 
 function drawFieldArrows() {
+  if (modeSelect.value === 'lineCharge') {
+    drawLineChargeField();
+    return;
+  }
+
   ctx.save();
+
   const gap = 48;
+
   for (let sy = 38; sy < H - 24; sy += gap) {
     for (let sx = 38; sx < W - 24; sx += gap) {
       const w = screenToWorld(sx, sy);
+
       if (modeSelect.value !== 'sphere' && w.y < 0.1) continue;
       if (modeSelect.value === 'sphere' && Math.hypot(w.x, w.y) < getA() + 0.1) continue;
 
       const f = fieldAt(w.x, w.y);
       const mag = Math.hypot(f.Ex, f.Ey);
+
       if (!Number.isFinite(mag) || mag < 0.005) continue;
 
       const ux = f.Ex / mag;
       const uy = f.Ey / mag;
+
       const len = Math.min(20, 8 + Math.log10(1 + mag) * 5);
       const x2 = sx + ux * len;
       const y2 = sy - uy * len;
@@ -516,12 +552,14 @@ function drawFieldArrows() {
       ctx.strokeStyle = 'rgba(226,232,240,0.42)';
       ctx.fillStyle = 'rgba(226,232,240,0.42)';
       ctx.lineWidth = 1;
+
       ctx.beginPath();
       ctx.moveTo(sx - ux * len * 0.45, sy + uy * len * 0.45);
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
       const ang = Math.atan2(y2 - sy, x2 - sx);
+
       ctx.beginPath();
       ctx.moveTo(x2, y2);
       ctx.lineTo(x2 - 6 * Math.cos(ang - 0.45), y2 - 6 * Math.sin(ang - 0.45));
@@ -530,31 +568,132 @@ function drawFieldArrows() {
       ctx.fill();
     }
   }
+
+  ctx.restore();
+}
+
+function drawLineChargeField() {
+  const lambda = getQ();
+  const h = realCharge.y;
+  const x0 = realCharge.x;
+
+  const lineLength = 4.6;
+  const half = lineLength / 2;
+  const samples = 45;
+  const gap = 44;
+
+  ctx.save();
+
+  for (let sy = 36; sy < H - 28; sy += gap) {
+    for (let sx = 36; sx < W - 28; sx += gap) {
+      const w = screenToWorld(sx, sy);
+
+      if (w.y < 0.06) continue;
+
+      let Ex = 0;
+      let Ey = 0;
+
+      for (let i = 0; i < samples; i++) {
+        const t = -half + (lineLength * i) / (samples - 1);
+        const elementX = x0 + t;
+        const dq = lambda / samples;
+
+        const dxReal = w.x - elementX;
+        const dyReal = w.y - h;
+        const rReal2 = dxReal * dxReal + dyReal * dyReal + 0.018;
+
+        Ex += dq * dxReal / rReal2;
+        Ey += dq * dyReal / rReal2;
+
+        const dxImage = w.x - elementX;
+        const dyImage = w.y + h;
+        const rImage2 = dxImage * dxImage + dyImage * dyImage + 0.018;
+
+        Ex += (-dq) * dxImage / rImage2;
+        Ey += (-dq) * dyImage / rImage2;
+      }
+
+      const mag = Math.hypot(Ex, Ey);
+      if (!Number.isFinite(mag) || mag < 0.003) continue;
+
+      const ux = Ex / mag;
+      const uy = Ey / mag;
+
+      const len = Math.min(24, 14 + Math.log10(1 + mag) * 5);
+
+      const x2 = sx + ux * len;
+      const y2 = sy - uy * len;
+
+      drawVectorArrow(sx, sy, x2, y2, mag);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawVectorArrow(x1, y1, x2, y2, mag) {
+  ctx.save();
+
+  const alpha = Math.min(0.78, 0.30 + Math.log10(1 + mag) * 0.22);
+
+  ctx.strokeStyle = `rgba(226,232,240,${alpha})`;
+  ctx.fillStyle = `rgba(226,232,240,${alpha})`;
+  ctx.lineWidth = 1.4;
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(
+    x2 - 6 * Math.cos(angle - 0.45),
+    y2 - 6 * Math.sin(angle - 0.45)
+  );
+  ctx.lineTo(
+    x2 - 6 * Math.cos(angle + 0.45),
+    y2 - 6 * Math.sin(angle + 0.45)
+  );
+  ctx.closePath();
+  ctx.fill();
+
   ctx.restore();
 }
 
 function drawPlaneConductor() {
   const y0 = worldToScreen(0, 0).y;
+
   ctx.save();
+
   ctx.shadowBlur = 16;
   ctx.shadowColor = 'rgba(226,232,240,0.45)';
   ctx.strokeStyle = 'rgba(226,232,240,0.95)';
   ctx.lineWidth = 4;
+
   ctx.beginPath();
   ctx.moveTo(35, y0);
   ctx.lineTo(W - 35, y0);
   ctx.stroke();
+
   ctx.shadowBlur = 0;
 
   ctx.strokeStyle = 'rgba(148,163,184,0.35)';
   ctx.lineWidth = 1;
+
   for (let x = 40; x < W - 35; x += 18) {
-    ctx.beginPath(); ctx.moveTo(x, y0 + 5); ctx.lineTo(x - 11, y0 + 22); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y0 + 5);
+    ctx.lineTo(x - 11, y0 + 22);
+    ctx.stroke();
   }
 
   ctx.fillStyle = 'rgba(226,232,240,0.85)';
   ctx.font = '12px system-ui';
   ctx.fillText('접지 도체 평면 V=0', 42, y0 - 12);
+
   ctx.restore();
 }
 
@@ -565,27 +704,42 @@ function drawPlaneDensity(kind) {
   const x0 = realCharge.x;
 
   ctx.save();
+
   for (let sx = 36; sx < W - 36; sx += 3) {
     const wx = screenToWorld(sx, y0).x;
     const dx = wx - x0;
+
     let sigma;
-    if (kind === 'point') sigma = -(Q * h) / (2 * Math.PI * Math.pow(dx * dx + h * h, 1.5));
-    else sigma = -(Q * h) / (Math.PI * (dx * dx + h * h));
+
+    if (kind === 'point') {
+      sigma = -(Q * h) / (2 * Math.PI * Math.pow(dx * dx + h * h, 1.5));
+    } else {
+      sigma = -(Q * h) / (Math.PI * (dx * dx + h * h));
+    }
 
     const intensity = Math.min(1, Math.abs(sigma) * 1.6);
+
     ctx.strokeStyle = sigma < 0
       ? `rgba(56,189,248,${0.22 + intensity * 0.78})`
       : `rgba(251,113,133,${0.22 + intensity * 0.78})`;
+
     ctx.lineWidth = 8;
-    ctx.beginPath(); ctx.moveTo(sx, y0 - 4); ctx.lineTo(sx + 3, y0 - 4); ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(sx, y0 - 4);
+    ctx.lineTo(sx + 3, y0 - 4);
+    ctx.stroke();
   }
+
   ctx.restore();
 }
 
 function drawCharge(x, y, q, label, dashed = false) {
   const p = worldToScreen(x, y);
   const positive = q >= 0;
+
   ctx.save();
+
   ctx.shadowBlur = 28;
   ctx.shadowColor = positive ? 'rgba(251,113,133,0.9)' : 'rgba(56,189,248,0.9)';
 
@@ -597,6 +751,7 @@ function drawCharge(x, y, q, label, dashed = false) {
   ctx.shadowBlur = 0;
   ctx.lineWidth = 2.5;
   ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+
   if (dashed) ctx.setLineDash([6, 5]);
   ctx.stroke();
   ctx.setLineDash([]);
@@ -609,21 +764,48 @@ function drawCharge(x, y, q, label, dashed = false) {
   ctx.fillStyle = positive ? '#7f1d1d' : '#0c4a6e';
   ctx.font = '900 18px system-ui';
   ctx.fillText(positive ? '+' : '−', p.x, p.y + 6);
+
   ctx.restore();
 }
 
 function drawLineChargeVisual(x, y, q, dashed) {
   const p = worldToScreen(x, y);
+  const positive = q >= 0;
+  const halfLength = 210;
+
   ctx.save();
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = q >= 0 ? 'rgba(251,113,133,0.8)' : 'rgba(56,189,248,0.8)';
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = q >= 0 ? 'rgba(251,113,133,0.75)' : 'rgba(56,189,248,0.75)';
-  if (dashed) ctx.setLineDash([8, 8]);
+
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = positive ? 'rgba(251,113,133,0.95)' : 'rgba(56,189,248,0.95)';
+  ctx.shadowBlur = 22;
+  ctx.shadowColor = positive ? 'rgba(251,113,133,0.75)' : 'rgba(56,189,248,0.75)';
+
+  if (dashed) ctx.setLineDash([11, 8]);
+
   ctx.beginPath();
-  ctx.moveTo(p.x - 170, p.y);
-  ctx.lineTo(p.x + 170, p.y);
+  ctx.moveTo(p.x - halfLength, p.y);
+  ctx.lineTo(p.x + halfLength, p.y);
   ctx.stroke();
+
+  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.strokeRect(p.x - halfLength, p.y - 9, halfLength * 2, 18);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(dashed ? "λ' = -λ" : 'λ', p.x, p.y - 18);
+
+  ctx.font = '900 17px system-ui';
+  ctx.fillStyle = positive ? '#fecaca' : '#bae6fd';
+
+  for (let i = -5; i <= 5; i++) {
+    ctx.fillText(positive ? '+' : '−', p.x + i * 36, p.y + 6);
+  }
+
   ctx.restore();
 }
 
@@ -636,19 +818,26 @@ function drawSphereDensity() {
   const c = worldToScreen(0, 0);
 
   ctx.save();
+
   for (let i = 0; i < 360; i++) {
     const t1 = i * Math.PI / 180;
     const t2 = (i + 1) * Math.PI / 180;
+
     const cosRel = Math.cos(t1 - chargeAngle);
     const denom = Math.pow(d * d + a * a - 2 * a * d * cosRel, 1.5);
+
     let sigma = -(Q / (4 * Math.PI * a)) * ((d * d - a * a) / denom);
+
     if (!grounded) sigma += Q / (4 * Math.PI * a * d);
+
     const intensity = Math.min(1, Math.abs(sigma) * 2.0);
 
     ctx.strokeStyle = sigma < 0
       ? `rgba(56,189,248,${0.2 + intensity * 0.8})`
       : `rgba(251,113,133,${0.2 + intensity * 0.8})`;
+
     ctx.lineWidth = 10;
+
     ctx.beginPath();
     ctx.arc(c.x, c.y, a * scale, -t1, -t2, true);
     ctx.stroke();
@@ -658,14 +847,18 @@ function drawSphereDensity() {
   ctx.shadowColor = 'rgba(226,232,240,0.55)';
   ctx.strokeStyle = 'rgba(226,232,240,0.95)';
   ctx.lineWidth = 2.5;
+
   ctx.beginPath();
   ctx.arc(c.x, c.y, a * scale, 0, Math.PI * 2);
   ctx.stroke();
+
   ctx.shadowBlur = 0;
+
   ctx.fillStyle = 'rgba(226,232,240,0.85)';
   ctx.font = '12px system-ui';
   ctx.textAlign = 'center';
   ctx.fillText(grounded ? '접지 구도체' : '비접지 중성 구도체', c.x, c.y + 4);
+
   ctx.restore();
 }
 
@@ -685,6 +878,7 @@ function drawPlanePoint() {
   const Q = getQ();
   const h = realCharge.y;
   const x0 = realCharge.x;
+
   const sigmaMax = -Q / (2 * Math.PI * h * h);
   const F = -(Q * Q) / (16 * Math.PI * EPS0 * h * h);
   const U = -(Q * Q) / (16 * Math.PI * EPS0 * h);
@@ -711,6 +905,7 @@ function drawLineCharge() {
   const lambda = getQ();
   const h = realCharge.y;
   const x0 = realCharge.x;
+
   const sigmaMax = -lambda / (Math.PI * h);
   const FperL = -(lambda * lambda) / (4 * Math.PI * EPS0 * h);
   const h0 = 1;
@@ -718,13 +913,12 @@ function drawLineCharge() {
 
   drawPlaneDensity('line');
   drawPlaneConductor();
+
   drawLineChargeVisual(x0, h, lambda, false);
   drawLineChargeVisual(x0, -h, -lambda, true);
-  drawCharge(x0, h, lambda, 'λ');
-  drawCharge(x0, -h, -lambda, "λ'", true);
 
   updateInfo({
-    mode: '무한평면 도체 + 무한 선전하',
+    mode: '무한평면 도체 + 선전하',
     pos: `(${fmt(x0, 'm')}, ${fmt(h, 'm')})`,
     distance: `h = ${fmt(h, 'm')}`,
     imageCharge: `λ' = ${fmt(-lambda, 'C/m')}`,
@@ -741,19 +935,24 @@ function drawSphere() {
   const a = getA();
   const d = Math.hypot(realCharge.x, realCharge.y);
   const theta = Math.atan2(realCharge.y, realCharge.x);
+
   const rp = a * a / d;
   const qi = -(a / d) * Q;
   const ix = rp * Math.cos(theta);
   const iy = rp * Math.sin(theta);
+
   const grounded = sphereTypeSelect.value === 'grounded';
   const qc = grounded ? 0 : (a / d) * Q;
+
   const distImage = d - rp;
 
   let sigmaMax = -(Q / (4 * Math.PI * a)) * ((d * d - a * a) / Math.pow(d - a, 3));
+
   if (!grounded) sigmaMax += Q / (4 * Math.PI * a * d);
 
   let F = K * Q * qi / (distImage * distImage);
   let U = 0.5 * K * Q * qi / distImage;
+
   if (!grounded) {
     F += K * Q * qc / (d * d);
     U += 0.5 * K * Q * qc / d;
@@ -762,6 +961,7 @@ function drawSphere() {
   drawSphereDensity();
   drawCharge(realCharge.x, realCharge.y, Q, 'Q');
   drawCharge(ix, iy, qi, "Q'", true);
+
   if (!grounded) drawCharge(0, 0, qc, "Q''", true);
 
   updateInfo({
@@ -781,20 +981,24 @@ function drawSphere() {
 
 function drawAxesLabels() {
   ctx.save();
+
   ctx.fillStyle = 'rgba(226,232,240,0.72)';
   ctx.font = '12px system-ui';
+
+  const o = worldToScreen(0, 0);
+
   if (modeSelect.value === 'sphere') {
-    const o = worldToScreen(0, 0);
     ctx.fillText('원점: 구도체 중심', o.x + 12, o.y - 12);
   } else {
-    const o = worldToScreen(0, 0);
     ctx.fillText('원점: 외부 전하 바로 아래 도체판 위', o.x + 12, o.y + 24);
   }
+
   ctx.restore();
 }
 
 function draw() {
   clampRealCharge();
+
   sphereTypeLabel.style.display = modeSelect.value === 'sphere' ? 'flex' : 'none';
   radiusLabel.style.display = modeSelect.value === 'sphere' ? 'flex' : 'none';
 
@@ -810,6 +1014,7 @@ function draw() {
 
 function requestDraw() {
   needsRedraw = true;
+
   requestAnimationFrame(() => {
     if (needsRedraw) {
       needsRedraw = false;
@@ -823,21 +1028,27 @@ canvas.addEventListener('mousedown', (e) => {
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
   const p = worldToScreen(realCharge.x, realCharge.y);
+
   if (Math.hypot(sx - p.x, sy - p.y) < 34) dragging = true;
 });
 
 canvas.addEventListener('mousemove', (e) => {
   if (!dragging) return;
+
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
   const w = screenToWorld(sx, sy);
+
   realCharge.x = w.x;
   realCharge.y = w.y;
+
   requestDraw();
 });
 
-window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('mouseup', () => {
+  dragging = false;
+});
 
 canvas.addEventListener('touchstart', (e) => {
   const t = e.touches[0];
@@ -845,23 +1056,30 @@ canvas.addEventListener('touchstart', (e) => {
   const sx = t.clientX - rect.left;
   const sy = t.clientY - rect.top;
   const p = worldToScreen(realCharge.x, realCharge.y);
+
   if (Math.hypot(sx - p.x, sy - p.y) < 42) dragging = true;
 }, { passive: true });
 
 canvas.addEventListener('touchmove', (e) => {
   if (!dragging) return;
+
   e.preventDefault();
+
   const t = e.touches[0];
   const rect = canvas.getBoundingClientRect();
   const sx = t.clientX - rect.left;
   const sy = t.clientY - rect.top;
   const w = screenToWorld(sx, sy);
+
   realCharge.x = w.x;
   realCharge.y = w.y;
+
   requestDraw();
 }, { passive: false });
 
-window.addEventListener('touchend', () => dragging = false);
+window.addEventListener('touchend', () => {
+  dragging = false;
+});
 
 modeSelect.addEventListener('change', resetPosition);
 sphereTypeSelect.addEventListener('change', requestDraw);
