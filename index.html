@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>전기영상법 시각화 시뮬레이터</title>
+  <style>
+    :root {
+      --bg: #050816;
+      --panel: rgba(15, 23, 42, 0.92);
+      --panel-2: rgba(2, 6, 23, 0.9);
+      --line: rgba(148, 163, 184, 0.22);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --blue: #38bdf8;
+      --red: #fb7185;
+      --yellow: #facc15;
+      --green: #34d399;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(244, 63, 94, 0.16), transparent 35%),
+        var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(2, 6, 23, 0.78);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(680px, 1fr) 380px;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+    }
+
+    .sim-card {
+      padding: 14px;
+      min-height: 760px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(110px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: end;
+    }
+
+    label {
+      color: #cbd5e1;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    select, input, button {
+      height: 38px;
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      border-radius: 11px;
+      background: rgba(15, 23, 42, 0.96);
+      color: var(--text);
+      padding: 0 10px;
+      outline: none;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 700;
+      background: linear-gradient(135deg, rgba(56,189,248,0.25), rgba(99,102,241,0.25));
+    }
+
+    canvas {
+      width: 100%;
+      height: 660px;
+      border-radius: 16px;
+      display: block;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: #020617;
+      cursor: grab;
+    }
+
+    canvas:active { cursor: grabbing; }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(2, 6, 23, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .side {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .side h2 {
+      margin: 0 0 4px;
+      font-size: 20px;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 0 0 8px;
+    }
+
+    .metric {
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--panel-2);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .metric strong {
+      font-size: 16px;
+      word-break: break-word;
+    }
+
+    .formula {
+      margin-top: 4px;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(2, 6, 23, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      color: #dbeafe;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.75;
+    }
+
+    .note {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      color: #bae6fd;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: repeat(2, 1fr); }
+      canvas { height: 560px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>전기영상법 Image Charge Method 시각화 시뮬레이터</h1>
+    <p>외부 전하를 마우스로 움직이면 영상전하, 전위 히트맵, 전기장 방향, 표면 유도 전하 밀도와 물리량이 실시간으로 갱신됩니다.</p>
+  </header>
+
+  <main class="app">
+    <section class="card sim-card">
+      <div class="toolbar">
+        <label>
+          시뮬레이션
+          <select id="mode">
+            <option value="planePoint">무한평면 도체 + 점전하</option>
+            <option value="lineCharge">무한평면 도체 + 무한 선전하</option>
+            <option value="sphere">구도체 + 점전하</option>
+          </select>
+        </label>
+
+        <label id="sphereTypeLabel">
+          구도체 조건
+          <select id="sphereType">
+            <option value="grounded">접지</option>
+            <option value="neutral">비접지 중성</option>
+          </select>
+        </label>
+
+        <label>
+          외부 전하 부호
+          <select id="chargeSign">
+            <option value="1">+ 양전하</option>
+            <option value="-1">− 음전하</option>
+          </select>
+        </label>
+
+        <label>
+          Q 또는 λ 크기
+          <input id="chargeInput" type="number" value="1" step="0.1" min="0" />
+        </label>
+
+        <label id="radiusLabel">
+          구 반지름 a
+          <input id="radiusInput" type="number" value="1.25" step="0.05" min="0.3" />
+        </label>
+
+        <button id="resetBtn">전하 위치 초기화</button>
+      </div>
+
+      <canvas id="canvas"></canvas>
+
+      <div class="legend">
+        <span class="chip"><span class="dot" style="background:#fb7185"></span> 양전하 / 양전위 / 양의 유도전하</span>
+        <span class="chip"><span class="dot" style="background:#38bdf8"></span> 음전하 / 음전위 / 음의 유도전하</span>
+        <span class="chip"><span class="dot" style="background:#cbd5e1"></span> 도체 경계</span>
+        <span class="chip">화살표: 전기장 방향</span>
+        <span class="chip">도체 표면 색: 유도 전하 밀도</span>
+      </div>
+    </section>
+
+    <aside class="card side">
+      <div>
+        <h2>실시간 계산값</h2>
+        <p class="desc">좌표계는 평면/선전하의 경우 도체판 위를 원점, 구도체의 경우 구 중심을 원점으로 설정했습니다.</p>
+      </div>
+
+      <div class="metric"><span>현재 모드</span><strong id="currentMode">-</strong></div>
+      <div class="metric"><span>외부 전하 위치</span><strong id="realPos">-</strong></div>
+      <div class="metric"><span>거리 h 또는 d</span><strong id="distanceValue">-</strong></div>
+      <div class="metric"><span>영상전하</span><strong id="imageCharge">-</strong></div>
+      <div class="metric"><span>영상전하 위치</span><strong id="imagePos">-</strong></div>
+      <div class="metric"><span>최대 유도 전하 밀도</span><strong id="sigmaMax">-</strong></div>
+      <div class="metric"><span>힘</span><strong id="forceValue">-</strong></div>
+      <div class="metric"><span>에너지</span><strong id="energyValue">-</strong></div>
+
+      <div class="formula" id="formulaBox"></div>
+
+      <div class="note">
+        실제 전하 단위는 시각화 편의를 위해 입력값을 그대로 사용합니다. 수치 단위까지 엄밀하게 맞추려면 Q를 nC, λ를 nC/m 등으로 고정하고 내부 변환 계수를 추가하면 됩니다.
+      </div>
+    </aside>
+  </main>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const modeSelect = document.getElementById('mode');
+const sphereTypeSelect = document.getElementById('sphereType');
+const sphereTypeLabel = document.getElementById('sphereTypeLabel');
+const chargeInput = document.getElementById('chargeInput');
+const chargeSign = document.getElementById('chargeSign');
+const radiusInput = document.getElementById('radiusInput');
+const radiusLabel = document.getElementById('radiusLabel');
+const resetBtn = document.getElementById('resetBtn');
+
+const EPS0 = 8.854e-12;
+const K = 1 / (4 * Math.PI * EPS0);
+
+let W = 900;
+let H = 660;
+let scale = 92;
+let dragging = false;
+let needsRedraw = true;
+
+let realCharge = { x: 0, y: 1.85 };
+
+const ui = {
+  currentMode: document.getElementById('currentMode'),
+  realPos: document.getElementById('realPos'),
+  distanceValue: document.getElementById('distanceValue'),
+  imageCharge: document.getElementById('imageCharge'),
+  imagePos: document.getElementById('imagePos'),
+  sigmaMax: document.getElementById('sigmaMax'),
+  forceValue: document.getElementById('forceValue'),
+  energyValue: document.getElementById('energyValue'),
+  formulaBox: document.getElementById('formulaBox')
+};
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = Math.floor(W * devicePixelRatio);
+  canvas.height = Math.floor(H * devicePixelRatio);
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  needsRedraw = true;
+  draw();
+}
+
+window.addEventListener('resize', resizeCanvas);
+
+function getQ() {
+  const sign = Number(chargeSign.value) || 1;
+  const magnitude = Math.abs(Number(chargeInput.value) || 1);
+  return sign * magnitude;
+}
+function getA() { return Math.max(0.3, Number(radiusInput.value) || 1.25); }
+
+function fmt(value, unit = '') {
+  if (!Number.isFinite(value)) return '-';
+  const abs = Math.abs(value);
+  if ((abs !== 0 && abs < 0.001) || abs >= 10000) return `${value.toExponential(3)} ${unit}`;
+  return `${value.toFixed(4)} ${unit}`;
+}
+
+function worldToScreen(x, y) {
+  if (modeSelect.value === 'sphere') {
+    return { x: W / 2 + x * scale, y: H / 2 - y * scale };
+  }
+  return { x: W / 2 + x * scale, y: H * 0.62 - y * scale };
+}
+
+function screenToWorld(sx, sy) {
+  if (modeSelect.value === 'sphere') {
+    return { x: (sx - W / 2) / scale, y: -(sy - H / 2) / scale };
+  }
+  return { x: (sx - W / 2) / scale, y: -(sy - H * 0.62) / scale };
+}
+
+function resetPosition() {
+  if (modeSelect.value === 'sphere') realCharge = { x: 2.75, y: 0 };
+  else realCharge = { x: 0, y: 1.85 };
+  needsRedraw = true;
+  draw();
+}
+
+function clampRealCharge() {
+  if (modeSelect.value === 'sphere') {
+    const a = getA();
+    const r = Math.hypot(realCharge.x, realCharge.y);
+    if (r < a + 0.32) {
+      const ang = Math.atan2(realCharge.y, realCharge.x) || 0;
+      realCharge.x = (a + 0.32) * Math.cos(ang);
+      realCharge.y = (a + 0.32) * Math.sin(ang);
+    }
+  } else {
+    realCharge.y = Math.max(0.32, realCharge.y);
+  }
+}
+
+function drawBackgroundGrid() {
+  ctx.save();
+  ctx.fillStyle = '#020617';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(148,163,184,0.09)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y <= H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function potentialAt(x, y) {
+  const mode = modeSelect.value;
+  const Q = getQ();
+  const soft = 0.045;
+
+  if (mode === 'planePoint') {
+    if (y < 0) return 0;
+    const h = realCharge.y;
+    const x0 = realCharge.x;
+    const r1 = Math.hypot(x - x0, y - h) + soft;
+    const r2 = Math.hypot(x - x0, y + h) + soft;
+    return Q / r1 - Q / r2;
+  }
+
+  if (mode === 'lineCharge') {
+    if (y < 0) return 0;
+    const h = realCharge.y;
+    const x0 = realCharge.x;
+    const r1 = Math.hypot(x - x0, y - h) + soft;
+    const r2 = Math.hypot(x - x0, y + h) + soft;
+    return -Q * Math.log(r1 / r2);
+  }
+
+  const a = getA();
+  const d = Math.hypot(realCharge.x, realCharge.y);
+  const ang = Math.atan2(realCharge.y, realCharge.x);
+  const r = Math.hypot(x, y);
+  if (r < a) return 0;
+
+  const rp = a * a / d;
+  const qi = -(a / d) * Q;
+  const ix = rp * Math.cos(ang);
+  const iy = rp * Math.sin(ang);
+  const r1 = Math.hypot(x - realCharge.x, y - realCharge.y) + soft;
+  const r2 = Math.hypot(x - ix, y - iy) + soft;
+  let V = Q / r1 + qi / r2;
+
+  if (sphereTypeSelect.value === 'neutral') {
+    const qc = (a / d) * Q;
+    const rc = Math.hypot(x, y) + soft;
+    V += qc / rc;
+  }
+  return V;
+}
+
+function colorForPotential(V) {
+  const t = Math.tanh(V * 0.55);
+  const a = Math.min(0.92, Math.abs(t) * 0.9);
+
+  if (t > 0) {
+    const r = 130 + Math.floor(125 * Math.abs(t));
+    const g = 20 + Math.floor(160 * Math.abs(t));
+    const b = 35 + Math.floor(20 * Math.abs(t));
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  const r = 20 + Math.floor(45 * Math.abs(t));
+  const g = 80 + Math.floor(120 * Math.abs(t));
+  const b = 150 + Math.floor(105 * Math.abs(t));
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function drawHeatmap() {
+  const step = 7;
+  ctx.save();
+  for (let sy = 0; sy < H; sy += step) {
+    for (let sx = 0; sx < W; sx += step) {
+      const w = screenToWorld(sx + step / 2, sy + step / 2);
+      const V = potentialAt(w.x, w.y);
+      ctx.fillStyle = colorForPotential(V);
+      ctx.fillRect(sx, sy, step + 1, step + 1);
+    }
+  }
+  ctx.restore();
+}
+
+function fieldAt(x, y) {
+  const delta = 0.018;
+  const vx1 = potentialAt(x + delta, y);
+  const vx0 = potentialAt(x - delta, y);
+  const vy1 = potentialAt(x, y + delta);
+  const vy0 = potentialAt(x, y - delta);
+  return {
+    Ex: -(vx1 - vx0) / (2 * delta),
+    Ey: -(vy1 - vy0) / (2 * delta)
+  };
+}
+
+function drawFieldArrows() {
+  ctx.save();
+  const gap = 48;
+  for (let sy = 38; sy < H - 24; sy += gap) {
+    for (let sx = 38; sx < W - 24; sx += gap) {
+      const w = screenToWorld(sx, sy);
+      if (modeSelect.value !== 'sphere' && w.y < 0.1) continue;
+      if (modeSelect.value === 'sphere' && Math.hypot(w.x, w.y) < getA() + 0.1) continue;
+
+      const f = fieldAt(w.x, w.y);
+      const mag = Math.hypot(f.Ex, f.Ey);
+      if (!Number.isFinite(mag) || mag < 0.005) continue;
+
+      const ux = f.Ex / mag;
+      const uy = f.Ey / mag;
+      const len = Math.min(20, 8 + Math.log10(1 + mag) * 5);
+      const x2 = sx + ux * len;
+      const y2 = sy - uy * len;
+
+      ctx.strokeStyle = 'rgba(226,232,240,0.42)';
+      ctx.fillStyle = 'rgba(226,232,240,0.42)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx - ux * len * 0.45, sy + uy * len * 0.45);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      const ang = Math.atan2(y2 - sy, x2 - sx);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - 6 * Math.cos(ang - 0.45), y2 - 6 * Math.sin(ang - 0.45));
+      ctx.lineTo(x2 - 6 * Math.cos(ang + 0.45), y2 - 6 * Math.sin(ang + 0.45));
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawPlaneConductor() {
+  const y0 = worldToScreen(0, 0).y;
+  ctx.save();
+  ctx.shadowBlur = 16;
+  ctx.shadowColor = 'rgba(226,232,240,0.45)';
+  ctx.strokeStyle = 'rgba(226,232,240,0.95)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(35, y0);
+  ctx.lineTo(W - 35, y0);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = 'rgba(148,163,184,0.35)';
+  ctx.lineWidth = 1;
+  for (let x = 40; x < W - 35; x += 18) {
+    ctx.beginPath(); ctx.moveTo(x, y0 + 5); ctx.lineTo(x - 11, y0 + 22); ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(226,232,240,0.85)';
+  ctx.font = '12px system-ui';
+  ctx.fillText('접지 도체 평면 V=0', 42, y0 - 12);
+  ctx.restore();
+}
+
+function drawPlaneDensity(kind) {
+  const Q = getQ();
+  const h = realCharge.y;
+  const y0 = worldToScreen(0, 0).y;
+  const x0 = realCharge.x;
+
+  ctx.save();
+  for (let sx = 36; sx < W - 36; sx += 3) {
+    const wx = screenToWorld(sx, y0).x;
+    const dx = wx - x0;
+    let sigma;
+    if (kind === 'point') sigma = -(Q * h) / (2 * Math.PI * Math.pow(dx * dx + h * h, 1.5));
+    else sigma = -(Q * h) / (Math.PI * (dx * dx + h * h));
+
+    const intensity = Math.min(1, Math.abs(sigma) * 1.6);
+    ctx.strokeStyle = sigma < 0
+      ? `rgba(56,189,248,${0.22 + intensity * 0.78})`
+      : `rgba(251,113,133,${0.22 + intensity * 0.78})`;
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(sx, y0 - 4); ctx.lineTo(sx + 3, y0 - 4); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCharge(x, y, q, label, dashed = false) {
+  const p = worldToScreen(x, y);
+  const positive = q >= 0;
+  ctx.save();
+  ctx.shadowBlur = 28;
+  ctx.shadowColor = positive ? 'rgba(251,113,133,0.9)' : 'rgba(56,189,248,0.9)';
+
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+  ctx.fillStyle = positive ? '#fb7185' : '#38bdf8';
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  if (dashed) ctx.setLineDash([6, 5]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, p.x, p.y - 28);
+
+  ctx.fillStyle = positive ? '#7f1d1d' : '#0c4a6e';
+  ctx.font = '900 18px system-ui';
+  ctx.fillText(positive ? '+' : '−', p.x, p.y + 6);
+  ctx.restore();
+}
+
+function drawLineChargeVisual(x, y, q, dashed) {
+  const p = worldToScreen(x, y);
+  ctx.save();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = q >= 0 ? 'rgba(251,113,133,0.8)' : 'rgba(56,189,248,0.8)';
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = q >= 0 ? 'rgba(251,113,133,0.75)' : 'rgba(56,189,248,0.75)';
+  if (dashed) ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.moveTo(p.x - 170, p.y);
+  ctx.lineTo(p.x + 170, p.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSphereDensity() {
+  const Q = getQ();
+  const a = getA();
+  const d = Math.hypot(realCharge.x, realCharge.y);
+  const chargeAngle = Math.atan2(realCharge.y, realCharge.x);
+  const grounded = sphereTypeSelect.value === 'grounded';
+  const c = worldToScreen(0, 0);
+
+  ctx.save();
+  for (let i = 0; i < 360; i++) {
+    const t1 = i * Math.PI / 180;
+    const t2 = (i + 1) * Math.PI / 180;
+    const cosRel = Math.cos(t1 - chargeAngle);
+    const denom = Math.pow(d * d + a * a - 2 * a * d * cosRel, 1.5);
+    let sigma = -(Q / (4 * Math.PI * a)) * ((d * d - a * a) / denom);
+    if (!grounded) sigma += Q / (4 * Math.PI * a * d);
+    const intensity = Math.min(1, Math.abs(sigma) * 2.0);
+
+    ctx.strokeStyle = sigma < 0
+      ? `rgba(56,189,248,${0.2 + intensity * 0.8})`
+      : `rgba(251,113,133,${0.2 + intensity * 0.8})`;
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, a * scale, -t1, -t2, true);
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = 'rgba(226,232,240,0.55)';
+  ctx.strokeStyle = 'rgba(226,232,240,0.95)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, a * scale, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(226,232,240,0.85)';
+  ctx.font = '12px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(grounded ? '접지 구도체' : '비접지 중성 구도체', c.x, c.y + 4);
+  ctx.restore();
+}
+
+function updateInfo(data) {
+  ui.currentMode.innerHTML = data.mode;
+  ui.realPos.innerHTML = data.pos;
+  ui.distanceValue.innerHTML = data.distance;
+  ui.imageCharge.innerHTML = data.imageCharge;
+  ui.imagePos.innerHTML = data.imagePos;
+  ui.sigmaMax.innerHTML = data.sigma;
+  ui.forceValue.innerHTML = data.force;
+  ui.energyValue.innerHTML = data.energy;
+  ui.formulaBox.innerHTML = data.formula;
+}
+
+function drawPlanePoint() {
+  const Q = getQ();
+  const h = realCharge.y;
+  const x0 = realCharge.x;
+  const sigmaMax = -Q / (2 * Math.PI * h * h);
+  const F = -(Q * Q) / (16 * Math.PI * EPS0 * h * h);
+  const U = -(Q * Q) / (16 * Math.PI * EPS0 * h);
+
+  drawPlaneDensity('point');
+  drawPlaneConductor();
+  drawCharge(x0, h, Q, 'Q');
+  drawCharge(x0, -h, -Q, "Q'", true);
+
+  updateInfo({
+    mode: '무한평면 도체 + 점전하',
+    pos: `(${fmt(x0, 'm')}, ${fmt(h, 'm')})`,
+    distance: `h = ${fmt(h, 'm')}`,
+    imageCharge: `Q' = ${fmt(-Q, 'C')}`,
+    imagePos: `(${fmt(x0, 'm')}, ${fmt(-h, 'm')})`,
+    sigma: fmt(sigmaMax, 'C/m²'),
+    force: fmt(F, 'N'),
+    energy: fmt(U, 'J'),
+    formula: `Q' = -Q<br>σ(ρ) = -Qh / [2π(ρ²+h²)^(3/2)]<br>σmax = -Q / 2πh²<br>F = -Q² / 16πε₀h²<br>U = -Q² / 16πε₀h`
+  });
+}
+
+function drawLineCharge() {
+  const lambda = getQ();
+  const h = realCharge.y;
+  const x0 = realCharge.x;
+  const sigmaMax = -lambda / (Math.PI * h);
+  const FperL = -(lambda * lambda) / (4 * Math.PI * EPS0 * h);
+  const h0 = 1;
+  const UperL = -(lambda * lambda) / (4 * Math.PI * EPS0) * Math.log(h / h0);
+
+  drawPlaneDensity('line');
+  drawPlaneConductor();
+  drawLineChargeVisual(x0, h, lambda, false);
+  drawLineChargeVisual(x0, -h, -lambda, true);
+  drawCharge(x0, h, lambda, 'λ');
+  drawCharge(x0, -h, -lambda, "λ'", true);
+
+  updateInfo({
+    mode: '무한평면 도체 + 무한 선전하',
+    pos: `(${fmt(x0, 'm')}, ${fmt(h, 'm')})`,
+    distance: `h = ${fmt(h, 'm')}`,
+    imageCharge: `λ' = ${fmt(-lambda, 'C/m')}`,
+    imagePos: `(${fmt(x0, 'm')}, ${fmt(-h, 'm')})`,
+    sigma: fmt(sigmaMax, 'C/m²'),
+    force: fmt(FperL, 'N/m'),
+    energy: fmt(UperL, 'J/m'),
+    formula: `λ' = -λ<br>σ(x) = -λh / π(x²+h²)<br>σmax = -λ / πh<br>F/L = -λ² / 4πε₀h<br>U/L = -λ² ln(h/h₀) / 4πε₀`
+  });
+}
+
+function drawSphere() {
+  const Q = getQ();
+  const a = getA();
+  const d = Math.hypot(realCharge.x, realCharge.y);
+  const theta = Math.atan2(realCharge.y, realCharge.x);
+  const rp = a * a / d;
+  const qi = -(a / d) * Q;
+  const ix = rp * Math.cos(theta);
+  const iy = rp * Math.sin(theta);
+  const grounded = sphereTypeSelect.value === 'grounded';
+  const qc = grounded ? 0 : (a / d) * Q;
+  const distImage = d - rp;
+
+  let sigmaMax = -(Q / (4 * Math.PI * a)) * ((d * d - a * a) / Math.pow(d - a, 3));
+  if (!grounded) sigmaMax += Q / (4 * Math.PI * a * d);
+
+  let F = K * Q * qi / (distImage * distImage);
+  let U = 0.5 * K * Q * qi / distImage;
+  if (!grounded) {
+    F += K * Q * qc / (d * d);
+    U += 0.5 * K * Q * qc / d;
+  }
+
+  drawSphereDensity();
+  drawCharge(realCharge.x, realCharge.y, Q, 'Q');
+  drawCharge(ix, iy, qi, "Q'", true);
+  if (!grounded) drawCharge(0, 0, qc, "Q''", true);
+
+  updateInfo({
+    mode: grounded ? '접지 구도체 + 점전하' : '비접지 중성 구도체 + 점전하',
+    pos: `(${fmt(realCharge.x, 'm')}, ${fmt(realCharge.y, 'm')})`,
+    distance: `d = ${fmt(d, 'm')}, a = ${fmt(a, 'm')}`,
+    imageCharge: grounded ? `Q' = ${fmt(qi, 'C')}` : `Q' = ${fmt(qi, 'C')}<br>Q'' = ${fmt(qc, 'C')}`,
+    imagePos: grounded ? `r' = ${fmt(rp, 'm')}` : `r' = ${fmt(rp, 'm')}<br>r'' = 0`,
+    sigma: fmt(sigmaMax, 'C/m²'),
+    force: fmt(F, 'N'),
+    energy: fmt(U, 'J'),
+    formula: grounded
+      ? `Q' = -(a/d)Q<br>r' = a²/d<br>σ(θ) = -Q(d²-a²) / [4πa(d²+a²-2ad cosθ)^(3/2)]<br>F = kQQ' / (d-r')²<br>U = 1/2 · kQQ' / (d-r')`
+      : `Q' = -(a/d)Q, Q'' = +(a/d)Q<br>r' = a²/d, r'' = 0<br>σ중성(θ) = σ접지(θ) + Q / 4πad<br>F = k[QQ'/(d-r')² + QQ''/d²]<br>U = 1/2 · k[QQ'/(d-r') + QQ''/d]`
+  });
+}
+
+function drawAxesLabels() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(226,232,240,0.72)';
+  ctx.font = '12px system-ui';
+  if (modeSelect.value === 'sphere') {
+    const o = worldToScreen(0, 0);
+    ctx.fillText('원점: 구도체 중심', o.x + 12, o.y - 12);
+  } else {
+    const o = worldToScreen(0, 0);
+    ctx.fillText('원점: 외부 전하 바로 아래 도체판 위', o.x + 12, o.y + 24);
+  }
+  ctx.restore();
+}
+
+function draw() {
+  clampRealCharge();
+  sphereTypeLabel.style.display = modeSelect.value === 'sphere' ? 'flex' : 'none';
+  radiusLabel.style.display = modeSelect.value === 'sphere' ? 'flex' : 'none';
+
+  drawBackgroundGrid();
+  drawHeatmap();
+  drawFieldArrows();
+  drawAxesLabels();
+
+  if (modeSelect.value === 'planePoint') drawPlanePoint();
+  if (modeSelect.value === 'lineCharge') drawLineCharge();
+  if (modeSelect.value === 'sphere') drawSphere();
+}
+
+function requestDraw() {
+  needsRedraw = true;
+  requestAnimationFrame(() => {
+    if (needsRedraw) {
+      needsRedraw = false;
+      draw();
+    }
+  });
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const p = worldToScreen(realCharge.x, realCharge.y);
+  if (Math.hypot(sx - p.x, sy - p.y) < 34) dragging = true;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+  realCharge.x = w.x;
+  realCharge.y = w.y;
+  requestDraw();
+});
+
+window.addEventListener('mouseup', () => dragging = false);
+
+canvas.addEventListener('touchstart', (e) => {
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const sx = t.clientX - rect.left;
+  const sy = t.clientY - rect.top;
+  const p = worldToScreen(realCharge.x, realCharge.y);
+  if (Math.hypot(sx - p.x, sy - p.y) < 42) dragging = true;
+}, { passive: true });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (!dragging) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const sx = t.clientX - rect.left;
+  const sy = t.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+  realCharge.x = w.x;
+  realCharge.y = w.y;
+  requestDraw();
+}, { passive: false });
+
+window.addEventListener('touchend', () => dragging = false);
+
+modeSelect.addEventListener('change', resetPosition);
+sphereTypeSelect.addEventListener('change', requestDraw);
+chargeSign.addEventListener('change', requestDraw);
+chargeInput.addEventListener('input', requestDraw);
+radiusInput.addEventListener('input', requestDraw);
+resetBtn.addEventListener('click', resetPosition);
+
+resizeCanvas();
+resetPosition();
+</script>
+</body>
+</html>
